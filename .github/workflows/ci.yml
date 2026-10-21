@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build SlapGlitch.app
+        run: ./build.sh
+      - name: Zip the app
+        run: ditto -c -k --keepParent SlapGlitch.app SlapGlitch.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SlapGlitch
+          path: SlapGlitch.zip
