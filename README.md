@@ -13,6 +13,11 @@
 
 </div>
 
+<p align="center">
+  <img src="docs/demo.gif" alt="SlapGlitch in action: a slap tears the screen into displaced slices with red and cyan ghosts, colored macroblocks and an inverted flash, then it snaps back to normal" width="900"><br>
+  <sub>One slap, real time</sub>
+</p>
+
 ---
 
 Apple silicon MacBooks have an accelerometer that macOS doesn't expose through any
