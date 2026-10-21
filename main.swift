@@ -3,6 +3,30 @@ import CoreImage
 import QuartzCore
 import ScreenCaptureKit
 
+// MARK: - Screen capture
+
+/// Screenshots every display (needs Screen Recording permission); empty on failure.
+func captureDisplays(halfRes: Bool, _ done: @escaping ([CGDirectDisplayID: CGImage]) -> Void) {
+    Task { @MainActor in
+        var out: [CGDirectDisplayID: CGImage] = [:]
+        do {
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            for d in content.displays {
+                let cfg = SCStreamConfiguration()
+                let scale = NSScreen.screens.first { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) == d.displayID }?.backingScaleFactor ?? 2
+                cfg.width = Int(Double(d.width) * scale / (halfRes ? 2 : 1))
+                cfg.height = Int(Double(d.height) * scale / (halfRes ? 2 : 1))
+                cfg.showsCursor = false
+                let filter = SCContentFilter(display: d, excludingWindows: [])
+                out[d.displayID] = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: cfg)
+            }
+        } catch {
+            NSLog("SlapGlitch: screen capture failed: %@", "\(error)")
+        }
+        done(out)
+    }
+}
+
 // MARK: - Glitch overlay (one per screen)
 
 final class GlitchWindow: NSWindow {
@@ -59,23 +83,9 @@ final class GlitchEngine {
     // Falls back to a synthetic glitch when Screen Recording permission isn't granted.
     private func capture(_ done: @escaping () -> Void) {
         shots.removeAll()
-        Task { @MainActor in
-            do {
-                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                for d in content.displays {
-                    let cfg = SCStreamConfiguration()
-                    let scale = NSScreen.screens.first { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) == d.displayID }?.backingScaleFactor ?? 2
-                    // Half resolution is plenty for a glitch and keeps it snappy.
-                    cfg.width = Int(Double(d.width) * scale / 2)
-                    cfg.height = Int(Double(d.height) * scale / 2)
-                    cfg.showsCursor = false
-                    let filter = SCContentFilter(display: d, excludingWindows: [])
-                    let img = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: cfg)
-                    shots[d.displayID] = (img, channel(img, r: 1, g: 0, b: 0), channel(img, r: 0, g: 1, b: 1))
-                }
-            } catch {
-                NSLog("SlapGlitch: screen capture failed: %@", "\(error)")
-            }
+        captureDisplays(halfRes: true) { [weak self] imgs in
+            guard let self else { return }
+            for (id, img) in imgs { self.shots[id] = (img, self.channel(img, r: 1, g: 0, b: 0), self.channel(img, r: 0, g: 1, b: 1)) }
             done()
         }
     }
@@ -200,6 +210,11 @@ final class GlitchEngine {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let accel = Accelerometer()
     var engine: GlitchEngine!
+    var matrix: MatrixEngine!
+    var broken = false   // mode: false = glitch, true = broken LCD matrix that stays
+    let modeItems = [NSMenuItem(title: "Glitch", action: #selector(setMode(_:)), keyEquivalent: ""),
+                     NSMenuItem(title: "Broken Matrix", action: #selector(setMode(_:)), keyEquivalent: "")]
+    let repairItem = NSMenuItem(title: "Repair Screen", action: #selector(repair), keyEquivalent: "r")
     var status: NSStatusItem!
     var enabled = true
     var slaps = 0
@@ -208,6 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ n: Notification) {
         engine = GlitchEngine()
+        matrix = MatrixEngine()
         if !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
 
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -218,6 +234,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(toggle)
         menu.addItem(countItem)
         menu.addItem(.separator())
+        let mode = NSMenuItem(title: "Mode", action: nil, keyEquivalent: "")
+        let modeMenu = NSMenu()
+        for (i, it) in modeItems.enumerated() {
+            it.tag = i
+            it.target = self
+            it.state = i == 0 ? .on : .off
+            modeMenu.addItem(it)
+        }
+        mode.submenu = modeMenu
+        menu.addItem(mode)
+        menu.addItem(repairItem)
         let sens = NSMenuItem(title: "Sensitivity", action: nil, keyEquivalent: "")
         let sub = NSMenu()
         for (i, (name, _)) in sensitivities.enumerated() {
@@ -228,7 +255,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         sens.submenu = sub
         menu.addItem(sens)
-        menu.addItem(NSMenuItem(title: "Test Glitch", action: #selector(test), keyEquivalent: "t"))
+        menu.addItem(NSMenuItem(title: "Test Slap", action: #selector(test), keyEquivalent: "t"))
         menu.addItem(NSMenuItem(title: "Screen Recording Settings…", action: #selector(openPrivacy), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit SlapGlitch", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -248,9 +275,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, self.enabled else { return }
             self.slaps += 1
             self.countItem.title = "Slaps: \(self.slaps)"
-            self.engine.trigger(strength: min(1, 0.25 + g / 1.5))
+            self.slap(strength: min(1, 0.25 + g / 1.5))
         }
         if CommandLine.arguments.contains("--demo") {
+            if CommandLine.arguments.contains("--broken") { setMode(modeItems[1]) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.test() }
         }
     }
@@ -260,7 +288,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         accel.threshold = sensitivities[i.tag].1
         i.menu?.items.forEach { $0.state = $0 === i ? .on : .off }
     }
-    @objc func test() { engine.trigger(strength: 0.8) }
+    @objc func test() { slap(strength: 0.8) }
+
+    func slap(strength: Double) {
+        if broken { matrix.hit(strength: strength) } else { engine.trigger(strength: strength) }
+    }
+
+    @objc func setMode(_ i: NSMenuItem) {
+        broken = i.tag == 1
+        modeItems.forEach { $0.state = $0 === i ? .on : .off }
+        if !broken { matrix.repair() }
+    }
+    @objc func repair() { matrix.repair() }
     @objc func openPrivacy() {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
     }

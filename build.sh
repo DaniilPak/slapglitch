@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 APP=SlapGlitch.app
 rm -rf $APP
 mkdir -p $APP/Contents/MacOS
-swiftc -O -swift-version 5 -target arm64-apple-macos14 Accel.swift main.swift -o $APP/Contents/MacOS/SlapGlitch
+swiftc -O -swift-version 5 -target arm64-apple-macos14 Accel.swift Matrix.swift main.swift -o $APP/Contents/MacOS/SlapGlitch
 cat > $APP/Contents/Info.plist <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
