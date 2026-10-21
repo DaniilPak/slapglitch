@@ -59,9 +59,9 @@ final class GlitchEngine {
     // Falls back to a synthetic glitch when Screen Recording permission isn't granted.
     private func capture(_ done: @escaping () -> Void) {
         shots.removeAll()
-        guard CGPreflightScreenCaptureAccess() else { return done() }
         Task { @MainActor in
-            if let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true) {
+            do {
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
                 for d in content.displays {
                     let cfg = SCStreamConfiguration()
                     let scale = NSScreen.screens.first { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) == d.displayID }?.backingScaleFactor ?? 2
@@ -70,10 +70,11 @@ final class GlitchEngine {
                     cfg.height = Int(Double(d.height) * scale / 2)
                     cfg.showsCursor = false
                     let filter = SCContentFilter(display: d, excludingWindows: [])
-                    if let img = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: cfg) {
-                        shots[d.displayID] = (img, channel(img, r: 1, g: 0, b: 0), channel(img, r: 0, g: 1, b: 1))
-                    }
+                    let img = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: cfg)
+                    shots[d.displayID] = (img, channel(img, r: 1, g: 0, b: 0), channel(img, r: 0, g: 1, b: 1))
                 }
+            } catch {
+                NSLog("SlapGlitch: screen capture failed: %@", "\(error)")
             }
             done()
         }
