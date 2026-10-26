@@ -211,9 +211,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let accel = Accelerometer()
     var engine: GlitchEngine!
     var matrix: MatrixEngine!
-    var broken = false   // mode: false = glitch, true = broken LCD matrix that stays
+    var scare: ScareEngine!
+    enum Mode: Int { case glitch, broken, halloween }
+    var mode = Mode.glitch
     let modeItems = [NSMenuItem(title: "Glitch", action: #selector(setMode(_:)), keyEquivalent: ""),
-                     NSMenuItem(title: "Broken Matrix", action: #selector(setMode(_:)), keyEquivalent: "")]
+                     NSMenuItem(title: "Broken Matrix", action: #selector(setMode(_:)), keyEquivalent: ""),
+                     NSMenuItem(title: "Halloween", action: #selector(setMode(_:)), keyEquivalent: "")]
     let repairItem = NSMenuItem(title: "Repair Screen", action: #selector(repair), keyEquivalent: "r")
     var status: NSStatusItem!
     var enabled = true
@@ -224,6 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         engine = GlitchEngine()
         matrix = MatrixEngine()
+        scare = ScareEngine()
         if !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
 
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -279,6 +283,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if CommandLine.arguments.contains("--demo") {
             if CommandLine.arguments.contains("--broken") { setMode(modeItems[1]) }
+            if CommandLine.arguments.contains("--halloween") { setMode(modeItems[2]) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.test() }
         }
     }
@@ -291,13 +296,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func test() { slap(strength: 0.8) }
 
     func slap(strength: Double) {
-        if broken { matrix.hit(strength: strength) } else { engine.trigger(strength: strength) }
+        switch mode {
+        case .glitch: engine.trigger(strength: strength)
+        case .broken: matrix.hit(strength: strength)
+        case .halloween: scare.trigger()
+        }
     }
 
     @objc func setMode(_ i: NSMenuItem) {
-        broken = i.tag == 1
+        mode = Mode(rawValue: i.tag) ?? .glitch
         modeItems.forEach { $0.state = $0 === i ? .on : .off }
-        if !broken { matrix.repair() }
+        if mode != .broken { matrix.repair() }
     }
     @objc func repair() { matrix.repair() }
     @objc func openPrivacy() {
