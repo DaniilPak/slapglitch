@@ -18,6 +18,14 @@
   <sub>One slap, real time</sub>
 </p>
 
+> [!TIP]
+> **From the maker of [ClarifierAI](https://tryclarifier.app)** — an AI writing keyboard
+> that rewrites, paraphrases, translates and polishes your text right inside any app.
+> A privacy-first Grammarly alternative.
+> [iPhone](https://apps.apple.com/us/app/clarifierai/id6755627408) ·
+> [Chrome](https://chromewebstore.google.com/detail/clarifierai/okpakmomhpgljjbcjkaiadmiegiohfge) ·
+> [tryclarifier.app](https://tryclarifier.app)
+
 ---
 
 Apple silicon MacBooks have an accelerometer that macOS doesn't expose through any
@@ -50,17 +58,27 @@ On first launch macOS asks for **Screen Recording** permission. Grant it so the 
 can tear apart your real screen. Without it, SlapGlitch falls back to a colored-noise
 glitch drawn over the desktop.
 
-To see the effect without slapping anything, choose **Test Glitch** (⌘T) from the
+To see the effect without slapping anything, choose **Test Slap** (⌘T) from the
 menu, or launch with `open SlapGlitch.app --args --demo`.
+
+## Modes
+
+| Mode | What a slap does |
+|---|---|
+| **Glitch** | Tears the screen apart, then snaps back |
+| **Broken Matrix** | "Kills" parts of the panel: dead columns, a rainbow band, dead rows. Stays until you choose **Repair Screen** (⌘R) |
+| **Halloween** 🎃 | A 3D zombie sprints out from deep inside your screen and lunges at you. Launch straight into it with `open SlapGlitch.app --args --halloween` |
 
 ## Menu
 
 | Item | What it does |
 |---|---|
 | **Enabled** | Turn slap detection on or off |
+| **Mode** | Glitch, Broken Matrix or Halloween |
+| **Repair Screen** | Undo Broken Matrix damage |
 | **Slaps: N** | How many slaps this session |
 | **Sensitivity** | Low (0.6 g), Medium (0.35 g) or High (0.18 g) above baseline |
-| **Test Glitch** | Trigger a glitch now |
+| **Test Slap** | Trigger the current mode now |
 | **Screen Recording Settings…** | Open the privacy pane to grant permission |
 
 ## How it works
@@ -91,6 +109,18 @@ Pull requests are welcome. Some ideas:
 - More glitch styles (pixel sort, datamosh, CRT roll) with a picker in the menu
 - Launch at login
 - A signed, notarized release build
+
+## Also by me: ClarifierAI
+
+If you enjoyed slapping your laptop, you might like something useful too.
+**[ClarifierAI](https://tryclarifier.app)** is an AI writing assistant built into your
+keyboard: rewrite, paraphrase, translate, fix grammar and check politeness in any app,
+without copy-pasting between tools. Made for non-native English speakers and anyone who
+wants their messages to land.
+
+- 📱 [ClarifierAI for iPhone](https://apps.apple.com/us/app/clarifierai/id6755627408)
+- 🌐 [ClarifierAI for Chrome](https://chromewebstore.google.com/detail/clarifierai/okpakmomhpgljjbcjkaiadmiegiohfge)
+- 🚀 [ClarifierAI on Product Hunt](https://www.producthunt.com/products/clarifierai-rewrite-text-2)
 
 ## License
 
